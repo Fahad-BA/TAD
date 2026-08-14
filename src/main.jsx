@@ -26,10 +26,11 @@ const normalizeRegion = (value) => {
 
 function findValue(value, keys, depth = 0) {
   if (!value || depth > 8 || typeof value !== 'object') return null;
-  for (const key of keys) if (typeof value[key] === 'string' && value[key].trim()) return value[key];
+  for (const key of keys) if (value[key] !== null && value[key] !== undefined && value[key] !== '') return value[key];
   for (const child of Object.values(value)) {
+    if (typeof child !== 'object' || child === null) continue;
     const result = findValue(child, keys, depth + 1);
-    if (result) return result;
+    if (result !== null) return result;
   }
   return null;
 }
@@ -59,9 +60,14 @@ function rapidApiUrl(endpoint, username) {
   const url = new URL(normalized.replace('{username}', encodeURIComponent(username)));
   // RapidAPI TikTok Scraper APIs commonly accept username and count. Existing
   // endpoint parameters are preserved, while count=1 limits the lookup.
-  if (!url.searchParams.has('username') && !url.searchParams.has('unique_id')) {
-    url.searchParams.set('username', username);
-    url.searchParams.set('unique_id', username);
+  if (url.pathname.includes('search')) {
+    // Search endpoints (e.g. /user/search) look up users by the `keywords` parameter.
+    if (!url.searchParams.has('keywords')) url.searchParams.set('keywords', username);
+  } else {
+    if (!url.searchParams.has('username') && !url.searchParams.has('unique_id')) {
+      url.searchParams.set('username', username);
+      url.searchParams.set('unique_id', username);
+    }
   }
   if (!url.searchParams.has('count')) url.searchParams.set('count', '1');
   return url.toString();
@@ -71,11 +77,26 @@ async function fetchRapidApiProfile(username, endpoint, apiKey, host) {
   if (!endpoint) throw new Error('RapidAPI endpoint is not configured');
   if (!apiKey) throw new Error('RapidAPI key is not configured');
   if (!host) throw new Error('RapidAPI host is not configured');
-  const data = await fetchJson(rapidApiUrl(endpoint, username), {
-    headers: { 'X-RapidAPI-Key': apiKey, 'X-RapidAPI-Host': host },
-  });
+  const headers = { 'X-RapidAPI-Key': apiKey, 'X-RapidAPI-Host': host };
+  const data = await fetchJson(rapidApiUrl(endpoint, username), { headers });
   const region = findValue(data, ['region', 'regionCode', 'countryCode', 'country', 'region_code', 'country_code']);
-  return { data, region, source: 'RapidAPI TikTok Scraper' };
+
+  // Search endpoints return stale stats — enrich with /user/info?user_id= for accurate
+  // follower/following counts, video count and privacy status.
+  const userId = data?.data?.user_list?.[0]?.user?.id;
+  const origin = new URL(endpoint).origin;
+  if (userId && origin) {
+    try {
+      const detail = await fetchJson(`${origin}/user/info?user_id=${encodeURIComponent(userId)}`, { headers });
+      const detailUser = detail?.data?.user;
+      if (detail?.code === 0 && detailUser) {
+        // Merge: keep the region from search (info has none), take fresh user + stats from info.
+        const mergedUser = { ...detailUser, ...detail.data.stats, region: detailUser.region ?? region };
+        return { data: { ...detail, data: { ...detail.data, user: mergedUser } }, region: mergedUser.region, source: 'RapidAPI search + user/info' };
+      }
+    } catch (err) { console.warn('user/info enrichment failed, using search data:', err.message); }
+  }
+  return { data, region, source: 'RapidAPI TikTok Scraper (search)' };
 }
 
 async function fetchTikTokProfile(username, endpoint, apiKey, host) {
@@ -115,8 +136,11 @@ async function fetchTikTokProfile(username, endpoint, apiKey, host) {
 }
 
 function profileFrom(data, username, region, source) {
-  const user = data?.data?.user || data?.user || data?.data?.userInfo?.user || data?.userInfo?.user || data;
-  const value = (keys, fallback = '—') => findValue(user, keys) || fallback;
+  // /user/search returns { data: { user_list: [{ user, stats }] } } — merge stats into the user object.
+  const entry = data?.data?.user_list?.[0];
+  const searchUser = entry ? { ...entry.user, ...entry.stats } : null;
+  const user = searchUser || data?.data?.user || data?.user || data?.data?.userInfo?.user || data?.userInfo?.user || data;
+  const value = (keys, fallback = '—') => findValue(user, keys) ?? fallback;
   return {
     name: value(['uniqueId', 'unique_id'], username), nick: value(['nickname', 'nickName'], username),
     avatar: value(['avatarLarger', 'avatarMedium', 'avatar'], `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(username)}`),
@@ -141,7 +165,7 @@ function App() {
   }
   return <main dir="rtl"><header><div className="brand"><b>TAD</b></div><div className="status"><i/> {loading ? 'جارٍ الجلب...' : profile ? `بيانات حقيقية · ${profile.source}` : 'جاهز'}</div></header>
     <section className="hero"><p className="eyebrow">لوحة تحكم ذكية للحسابات</p><h1>اعرف تفاصيل حساب<br/><em>TikTok</em> في ثوانٍ.</h1><p className="lead">أدخل اسم المستخدم لاستخراج الدولة/المنطقة الفعلية من بيانات الملف العامة.</p><form onSubmit={search}><span>@</span><input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="أدخل اسم المستخدم..."/><button disabled={loading}>{loading ? 'جارٍ...' : 'عرض المعلومات'}</button></form>{error && <p className="error">{error}</p>}</section>
-    {profile && <section className="result"><div className="profile card"><img src={profile.avatar}/><div><h2>{profile.nick} {profile.verified === true && <small>✓ موثّق</small>}</h2><p className="handle">@{profile.name}</p><p>{profile.sig}</p></div><label>بيانات حقيقية</label></div><div className="grid"><article className="card"><h3>معرّفات المستخدم</h3><dl><dt>Unique ID</dt><dd>{profile.id}</dd><dt>secUid</dt><dd className="mono">{profile.sec}</dd><dt>حالة التحقق</dt><dd>{profile.verified === true ? 'حساب موثّق' : 'غير موثّق'}</dd></dl></article><article className="card"><h3>إحصائيات الحساب</h3><div className="stats"><div><strong>{profile.followers}</strong><span>المتابعون</span></div><div><strong>{profile.following}</strong><span>يتابع</span></div><div><strong>{profile.hearts}</strong><span>الإعجابات</span></div><div><strong>{profile.videos}</strong><span>الفيديوهات</span></div></div></article><article className="card"><h3>الدولة والإعدادات</h3><dl><dt>الدولة/المنطقة الفعلية</dt><dd className="country">{profile.reg[2]} {profile.reg[1]} <b>{profile.reg[0]}</b></dd><dt>المصدر</dt><dd>{profile.source}</dd><dt>الخصوصية</dt><dd>{profile.private === true ? '🔒 حساب خاص' : '🌐 حساب عام'}</dd></dl></article></div></section>}
+    {profile && <section className="result"><div className="profile card"><img src={profile.avatar}/><div><h2>{profile.nick} {profile.verified === true && <small>✓ موثّق</small>}</h2><p className="handle">@{profile.name}</p><p>{profile.sig}</p></div><label>بيانات حقيقية</label></div><div className="grid"><article className="card"><h3>إحصائيات الحساب</h3><div className="stats"><div><strong>{profile.followers}</strong><span>المتابعون</span></div><div><strong>{profile.following}</strong><span>يتابع</span></div><div><strong>{profile.hearts}</strong><span>الإعجابات</span></div><div><strong>{profile.videos}</strong><span>الفيديوهات</span></div></div></article><article className="card"><h3>الدولة والإعدادات</h3><dl><dt>الدولة/المنطقة الفعلية</dt><dd className="country">{profile.reg[2]} {profile.reg[1]} <b>{profile.reg[0]}</b></dd><dt>الخصوصية</dt><dd>{profile.private === true ? '🔒 حساب خاص' : '🌐 حساب عام'}</dd></dl></article></div></section>}
     <footer>TAD · تُعرض الدولة فقط عندما تعيدها البيانات؛ لا يتم تخمينها أو توليدها محلياً</footer></main>;
 }
 createRoot(document.getElementById('root')).render(<App/>);
