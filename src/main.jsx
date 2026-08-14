@@ -1,12 +1,35 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 
-const regionNames = {
-  SA: ['السعودية', '🇸🇦'], AE: ['الإمارات', '🇦🇪'], KW: ['الكويت', '🇰🇼'], QA: ['قطر', '🇶🇦'],
-  BH: ['البحرين', '🇧🇭'], OM: ['عُمان', '🇴🇲'], US: ['الولايات المتحدة', '🇺🇸'], GB: ['المملكة المتحدة', '🇬🇧'],
-  CA: ['كندا', '🇨🇦'], AU: ['أستراليا', '🇦🇺'], DE: ['ألمانيا', '🇩🇪'], FR: ['فرنسا', '🇫🇷'],
-  TR: ['تركيا', '🇹🇷'], EG: ['مصر', '🇪🇬'], IN: ['الهند', '🇮🇳'], PK: ['باكستان', '🇵🇰'],
+import regions from './regions.json';
+
+// Flag emoji is generated from the ISO code (regional indicator symbols).
+const flagOf = (code) => /^[A-Z]{2}$/.test(code) ? [...code].map((c) => String.fromCodePoint(127397 + c.charCodeAt())).join('') : '🌐';
+
+const i18n = {
+  en: {
+    dir: 'ltr', statusReady: 'Ready', statusLoading: 'Loading…', statusReal: 'Real data',
+    heroA: 'Get any', heroB: 'account details in seconds.',
+    placeholder: 'Enter username…', submit: 'Show Info', loading: 'Loading…',
+    realLabel: 'Real data', verified: 'Verified',
+    statsTitle: 'Account Stats', followers: 'Followers', following: 'Following', hearts: 'Likes', videos: 'Videos',
+    countryTitle: 'Country & Settings', country: 'Actual Country/Region', privacy: 'Privacy',
+    privateAcc: 'Private account', publicAcc: 'Public account',
+    errorPrefix: 'Failed to fetch real data:', errorSuffix: 'Check the username or source settings.',
+    langButton: 'عربي',
+  },
+  ar: {
+    dir: 'rtl', statusReady: 'جاهز', statusLoading: 'جارٍ الجلب…', statusReal: 'بيانات حقيقية',
+    heroA: 'اعرف تفاصيل حساب', heroB: 'في ثوانٍ.',
+    placeholder: 'أدخل اسم المستخدم…', submit: 'عرض المعلومات', loading: 'جارٍ…',
+    realLabel: 'بيانات حقيقية', verified: 'موثّق',
+    statsTitle: 'إحصائيات الحساب', followers: 'المتابعون', following: 'يتابع', hearts: 'الإعجابات', videos: 'الفيديوهات',
+    countryTitle: 'الدولة والإعدادات', country: 'الدولة/المنطقة الفعلية', privacy: 'الخصوصية',
+    privateAcc: 'حساب خاص', publicAcc: 'حساب عام',
+    errorPrefix: 'تعذر جلب البيانات الحقيقية:', errorSuffix: 'تحقق من اسم المستخدم أو إعدادات المصدر.',
+    langButton: 'English',
+  },
 };
 
 const env = import.meta.env;
@@ -16,12 +39,12 @@ const defaultRapidApiHost = envValue('RAPIDAPI_HOST');
 const defaultRapidApiEndpoint = envValue('RAPIDAPI_ENDPOINT');
 
 const normalizeRegion = (value) => {
-  if (!value) return ['—', 'غير محددة من المصدر', '🌐'];
+  if (!value) return ['—', { en: 'Not provided by source', ar: 'غير محددة من المصدر' }, '🌐'];
   const raw = String(value).trim();
   const code = raw.toUpperCase().replace(/[^A-Z]/g, '');
-  if (regionNames[code]) return [code, ...regionNames[code]];
-  const found = Object.entries(regionNames).find(([, [name]]) => name === raw || name.toLowerCase() === raw.toLowerCase());
-  return found ? [found[0], ...found[1]] : ['—', raw, '🌐'];
+  if (regions[code]) return [code, { en: regions[code][0], ar: regions[code][1] }, flagOf(code)];
+  const found = Object.entries(regions).find(([, names]) => names.some((name) => name.toLowerCase() === raw.toLowerCase()));
+  return found ? [found[0], { en: found[1][0], ar: found[1][1] }, flagOf(found[0])] : ['—', { en: raw, ar: raw }, '🌐'];
 };
 
 function findValue(value, keys, depth = 0) {
@@ -164,19 +187,26 @@ function profileFrom(data, username, region, source) {
 }
 
 function App() {
+  const [lang, setLang] = useState(() => localStorage.getItem('tad-lang') || 'en');
   const [username, setUsername] = useState(''); const [profile, setProfile] = useState(null);
   const [endpoint, setEndpoint] = useState(defaultRapidApiEndpoint);
   const [key, setKey] = useState(defaultRapidApiKey); const [host, setHost] = useState(defaultRapidApiHost);
   const [loading, setLoading] = useState(false); const [error, setError] = useState('');
+  const t = i18n[lang];
+  useEffect(() => {
+    document.documentElement.dir = t.dir;
+    document.documentElement.lang = lang;
+    localStorage.setItem('tad-lang', lang);
+  }, [lang]);
   async function search(event) {
     event.preventDefault(); const name = username.trim().replace(/^@/, '') || 'creator'; setLoading(true); setError('');
     try { const result = await fetchTikTokProfile(name, endpoint, key, host); setProfile(profileFrom(result.data, name, result.region, result.source)); }
-    catch (err) { setProfile(null); setError(`تعذر جلب البيانات الحقيقية: ${err.message}. تحقق من اسم المستخدم أو إعدادات المصدر.`); }
+    catch (err) { setProfile(null); setError(`${t.errorPrefix} ${err.message}. ${t.errorSuffix}`); }
     finally { setLoading(false); }
   }
-  return <main dir="rtl"><header><div className="brand"><b>TAD</b></div><div className="status"><i/> {loading ? 'جارٍ الجلب...' : profile ? `بيانات حقيقية` : 'جاهز'}</div></header>
-    <section className="hero"><h1>اعرف تفاصيل حساب<br/><em>TikTok</em> في ثوانٍ.</h1><br></br><form onSubmit={search}><span>@</span><input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="أدخل اسم المستخدم..."/><button disabled={loading}>{loading ? 'جارٍ...' : 'عرض المعلومات'}</button></form>{error && <p className="error">{error}</p>}</section>
-    {profile && <section className="result"><div className="profile card"><img src={profile.avatar}/><div><h2>{profile.nick} {profile.verified === true && <small>✓ موثّق</small>}</h2><p className="handle">@{profile.name}</p><p>{profile.sig}</p></div><label>بيانات حقيقية</label></div><div className="grid"><article className="card"><h3>إحصائيات الحساب</h3><div className="stats"><div><strong>{profile.followers}</strong><span>المتابعون</span></div><div><strong>{profile.following}</strong><span>يتابع</span></div><div><strong>{profile.hearts}</strong><span>الإعجابات</span></div><div><strong>{profile.videos}</strong><span>الفيديوهات</span></div></div></article><article className="card"><h3>الدولة والإعدادات</h3><dl><dt>الدولة/المنطقة الفعلية</dt><dd className="country">{profile.reg[2]} {profile.reg[1]} <b>{profile.reg[0]}</b></dd><dt>الخصوصية</dt><dd>{profile.private === true ? '🔒 حساب خاص' : '🌐 حساب عام'}</dd></dl></article></div></section>}
+  return <main dir={t.dir}><header><div className="brand"><b>TAD</b></div><div className="header-actions"><div className="status"><i/> {loading ? t.statusLoading : profile ? t.statusReal : t.statusReady}</div><button className="lang" onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}>{t.langButton}</button></div></header>
+    <section className="hero"><h1>{t.heroA} <em>TikTok</em> {t.heroB}</h1><br></br><form onSubmit={search}><span>@</span><input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t.placeholder}/><button disabled={loading}>{loading ? t.loading : t.submit}</button></form>{error && <p className="error">{error}</p>}</section>
+    {profile && <section className="result"><div className="profile card"><img src={profile.avatar}/><div><h2>{profile.nick} {profile.verified === true && <small>✓ {t.verified}</small>}</h2><p className="handle">@{profile.name}</p><p>{profile.sig}</p></div><label>{t.realLabel}</label></div><div className="grid"><article className="card"><h3>{t.statsTitle}</h3><div className="stats"><div><strong>{profile.followers}</strong><span>{t.followers}</span></div><div><strong>{profile.following}</strong><span>{t.following}</span></div><div><strong>{profile.hearts}</strong><span>{t.hearts}</span></div><div><strong>{profile.videos}</strong><span>{t.videos}</span></div></div></article><article className="card"><h3>{t.countryTitle}</h3><dl><dt>{t.country}</dt><dd className="country">{profile.reg[2]} {profile.reg[1][lang]} <b>{profile.reg[0]}</b></dd><dt>{t.privacy}</dt><dd>{profile.private === true ? `🔒 ${t.privateAcc}` : `🌐 ${t.publicAcc}`}</dd></dl></article></div></section>}
   </main>;
 }
 createRoot(document.getElementById('root')).render(<App/>);
