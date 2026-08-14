@@ -35,7 +35,7 @@ function findValue(value, keys, depth = 0) {
 }
 
 function parseProfileJson(html) {
-  const scripts = [...html.matchAll(/<script[^>]*>([\\s\\S]*?)<\\/script>/gi)].map((match) => match[1].trim());
+  const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1].trim());
   for (const script of scripts) {
     if (!script.startsWith('{') || (!script.includes('region') && !script.includes('country'))) continue;
     try {
