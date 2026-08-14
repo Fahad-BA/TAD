@@ -92,6 +92,17 @@ async function fetchRapidApiProfile(username, endpoint, apiKey, host) {
       if (detail?.code === 0 && detailUser) {
         // Merge: keep the region from search (info has none), take fresh user + stats from info.
         const mergedUser = { ...detailUser, ...detail.data.stats, region: detailUser.region ?? region };
+        // Private accounts: RapidAPI omits the bio — try TikWM as a public fallback.
+        if (!mergedUser.signature) {
+          try {
+            const wm = await fetchJson(`https://www.tikwm.com/api/user/info?unique_id=${encodeURIComponent(username)}`);
+            const wmUser = wm?.data?.user;
+            if (wm?.code === 0 && wmUser?.signature) {
+              mergedUser.signature = wmUser.signature;
+              return { data: { ...detail, data: { ...detail.data, user: mergedUser } }, region: mergedUser.region, source: 'RapidAPI search + user/info + TikWM (bio)' };
+            }
+          } catch { /* Bio stays hidden; TikWM may be unreachable. */ }
+        }
         return { data: { ...detail, data: { ...detail.data, user: mergedUser } }, region: mergedUser.region, source: 'RapidAPI search + user/info' };
       }
     } catch (err) { console.warn('user/info enrichment failed, using search data:', err.message); }
@@ -163,9 +174,9 @@ function App() {
     catch (err) { setProfile(null); setError(`تعذر جلب البيانات الحقيقية: ${err.message}. تحقق من اسم المستخدم أو إعدادات المصدر.`); }
     finally { setLoading(false); }
   }
-  return <main dir="rtl"><header><div className="brand"><b>TAD</b></div><div className="status"><i/> {loading ? 'جارٍ الجلب...' : profile ? `بيانات حقيقية · ${profile.source}` : 'جاهز'}</div></header>
-    <section className="hero"><p className="eyebrow">لوحة تحكم ذكية للحسابات</p><h1>اعرف تفاصيل حساب<br/><em>TikTok</em> في ثوانٍ.</h1><p className="lead">أدخل اسم المستخدم لاستخراج الدولة/المنطقة الفعلية من بيانات الملف العامة.</p><form onSubmit={search}><span>@</span><input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="أدخل اسم المستخدم..."/><button disabled={loading}>{loading ? 'جارٍ...' : 'عرض المعلومات'}</button></form>{error && <p className="error">{error}</p>}</section>
+  return <main dir="rtl"><header><div className="brand"><b>TAD</b></div><div className="status"><i/> {loading ? 'جارٍ الجلب...' : profile ? `بيانات حقيقية` : 'جاهز'}</div></header>
+    <section className="hero"><h1>اعرف تفاصيل حساب<br/><em>TikTok</em> في ثوانٍ.</h1><br></br><form onSubmit={search}><span>@</span><input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="أدخل اسم المستخدم..."/><button disabled={loading}>{loading ? 'جارٍ...' : 'عرض المعلومات'}</button></form>{error && <p className="error">{error}</p>}</section>
     {profile && <section className="result"><div className="profile card"><img src={profile.avatar}/><div><h2>{profile.nick} {profile.verified === true && <small>✓ موثّق</small>}</h2><p className="handle">@{profile.name}</p><p>{profile.sig}</p></div><label>بيانات حقيقية</label></div><div className="grid"><article className="card"><h3>إحصائيات الحساب</h3><div className="stats"><div><strong>{profile.followers}</strong><span>المتابعون</span></div><div><strong>{profile.following}</strong><span>يتابع</span></div><div><strong>{profile.hearts}</strong><span>الإعجابات</span></div><div><strong>{profile.videos}</strong><span>الفيديوهات</span></div></div></article><article className="card"><h3>الدولة والإعدادات</h3><dl><dt>الدولة/المنطقة الفعلية</dt><dd className="country">{profile.reg[2]} {profile.reg[1]} <b>{profile.reg[0]}</b></dd><dt>الخصوصية</dt><dd>{profile.private === true ? '🔒 حساب خاص' : '🌐 حساب عام'}</dd></dl></article></div></section>}
-    <footer>TAD · تُعرض الدولة فقط عندما تعيدها البيانات؛ لا يتم تخمينها أو توليدها محلياً</footer></main>;
+  </main>;
 }
 createRoot(document.getElementById('root')).render(<App/>);
