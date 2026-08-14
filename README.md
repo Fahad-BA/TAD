@@ -10,7 +10,7 @@ A bilingual (EN/AR) installable PWA for retrieving real TikTok account details �
 [![Vite](https://img.shields.io/badge/Vite-Frontend-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
 [![PWA](https://img.shields.io/badge/PWA-Installable-5A0FC8?logo=pwa&logoColor=white)](https://web.dev/learn/pwa/)
 [![RapidAPI](https://img.shields.io/badge/RapidAPI-TikTok%20Scraper-00AEEF?logo=rapid&logoColor=white)](https://rapidapi.com/)
-[![License](https://img.shields.io/badge/license-private-lightgrey)](#license)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
 [Features](#features) · [Architecture](#architecture) · [Getting Started](#getting-started) · [Configuration](#configuration) · [Deployment](#deployment) · [Troubleshooting](#troubleshooting)
 
@@ -202,7 +202,7 @@ rm -rf node_modules && npm install && npm run build
 
 ## License
 
-No open-source license is declared. Unless the owner adds one, all rights are reserved.
+This project is licensed under the [MIT License](./LICENSE).
 
 ## Disclaimer
 
