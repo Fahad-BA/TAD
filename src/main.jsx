@@ -54,10 +54,15 @@ async function fetchJson(url, options = {}) {
 }
 
 function rapidApiUrl(endpoint, username) {
-  const url = new URL(endpoint.replace('{username}', encodeURIComponent(username)));
+  // Add the https scheme automatically when the endpoint lacks it.
+  const normalized = /^[a-z][a-z0-9+.-]*:\/\//i.test(endpoint) ? endpoint : `https://${endpoint}`;
+  const url = new URL(normalized.replace('{username}', encodeURIComponent(username)));
   // RapidAPI TikTok Scraper APIs commonly accept username and count. Existing
   // endpoint parameters are preserved, while count=1 limits the lookup.
-  if (!url.searchParams.has('username')) url.searchParams.set('username', username);
+  if (!url.searchParams.has('username') && !url.searchParams.has('unique_id')) {
+    url.searchParams.set('username', username);
+    url.searchParams.set('unique_id', username);
+  }
   if (!url.searchParams.has('count')) url.searchParams.set('count', '1');
   return url.toString();
 }
@@ -78,7 +83,14 @@ async function fetchTikTokProfile(username, endpoint, apiKey, host) {
   const configuredEndpoint = endpoint.trim() || defaultRapidApiEndpoint;
   const configuredKey = apiKey.trim() || defaultRapidApiKey;
   const configuredHost = host.trim() || defaultRapidApiHost;
-  if (configuredEndpoint) return fetchRapidApiProfile(clean, configuredEndpoint, configuredKey, configuredHost);
+  if (configuredEndpoint) {
+    try {
+      return await fetchRapidApiProfile(clean, configuredEndpoint, configuredKey, configuredHost);
+    } catch (err) {
+      // RapidAPI failed (bad config, quota, network) — fall back to public sources below.
+      console.warn('RapidAPI lookup failed, falling back to public sources:', err.message);
+    }
+  }
 
   // TikTok's public profile page contains the same SSR hydration data used by its web client.
   try {
@@ -118,7 +130,7 @@ function App() {
     catch (err) { setProfile(null); setError(`تعذر جلب البيانات الحقيقية: ${err.message}. تحقق من اسم المستخدم أو إعدادات المصدر.`); }
     finally { setLoading(false); }
   }
-  return <main dir="rtl"><header><div className="brand"><b>TAD</b><span>TikTok Account Details</span></div><div className="status"><i/> {loading ? 'جارٍ الجلب...' : profile ? `بيانات حقيقية · ${profile.source}` : 'جاهز'}</div></header>
+  return <main dir="rtl"><header><div className="brand"><b>TAD</b></div><div className="status"><i/> {loading ? 'جارٍ الجلب...' : profile ? `بيانات حقيقية · ${profile.source}` : 'جاهز'}</div></header>
     <section className="hero"><p className="eyebrow">لوحة تحكم ذكية للحسابات</p><h1>اعرف تفاصيل حساب<br/><em>TikTok</em> في ثوانٍ.</h1><p className="lead">أدخل اسم المستخدم لاستخراج الدولة/المنطقة الفعلية من بيانات الملف العامة.</p><form onSubmit={search}><span>@</span><input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="أدخل اسم المستخدم..."/><button disabled={loading}>{loading ? 'جارٍ...' : 'عرض المعلومات'}</button></form>{error && <p className="error">{error}</p>}</section>
     {profile && <section className="result"><div className="profile card"><img src={profile.avatar}/><div><h2>{profile.nick} {profile.verified === true && <small>✓ موثّق</small>}</h2><p className="handle">@{profile.name}</p><p>{profile.sig}</p></div><label>بيانات حقيقية</label></div><div className="grid"><article className="card"><h3>معرّفات المستخدم</h3><dl><dt>Unique ID</dt><dd>{profile.id}</dd><dt>secUid</dt><dd className="mono">{profile.sec}</dd><dt>حالة التحقق</dt><dd>{profile.verified === true ? 'حساب موثّق' : 'غير موثّق'}</dd></dl></article><article className="card"><h3>إحصائيات الحساب</h3><div className="stats"><div><strong>{profile.followers}</strong><span>المتابعون</span></div><div><strong>{profile.following}</strong><span>يتابع</span></div><div><strong>{profile.hearts}</strong><span>الإعجابات</span></div><div><strong>{profile.videos}</strong><span>الفيديوهات</span></div></div></article><article className="card"><h3>الدولة والإعدادات</h3><dl><dt>الدولة/المنطقة الفعلية</dt><dd className="country">{profile.reg[2]} {profile.reg[1]} <b>{profile.reg[0]}</b></dd><dt>المصدر</dt><dd>{profile.source}</dd><dt>الخصوصية</dt><dd>{profile.private === true ? '🔒 حساب خاص' : '🌐 حساب عام'}</dd></dl></article></div></section>}
     <section className="advanced card"><button className="expand" onClick={() => setAdvanced(!advanced)}>⚙ الإعدادات المتقدمة <span>{advanced ? '−' : '+'}</span></button>{advanced && <div className="fields"><label>RapidAPI Endpoint<input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="https://.../user/info"/></label><label>RapidAPI Host<input value={host} onChange={(e) => setHost(e.target.value)} placeholder="اسم المضيف في RapidAPI"/></label><label>RapidAPI Key<input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="أدخل المفتاح اختيارياً"/></label><p>عند ضبط Endpoint يستخدم التطبيق ترويسة X-RapidAPI-Key و X-RapidAPI-Host، ويرسل username و count=1 مع الحفاظ على معاملات endpoint الحالية. اترك Endpoint فارغاً لاستخدام TikTok SSR ثم TikWM تلقائياً.</p></div>}</section><footer>TAD · تُعرض الدولة فقط عندما تعيدها البيانات؛ لا يتم تخمينها أو توليدها محلياً</footer></main>;
