@@ -16,7 +16,7 @@ const defaultRapidApiHost = envValue('RAPIDAPI_HOST');
 const defaultRapidApiEndpoint = envValue('RAPIDAPI_ENDPOINT');
 
 const normalizeRegion = (value) => {
-  if (!value) return null;
+  if (!value) return ['—', 'غير محددة من المصدر', '🌐'];
   const raw = String(value).trim();
   const code = raw.toUpperCase().replace(/[^A-Z]/g, '');
   if (regionNames[code]) return [code, ...regionNames[code]];
@@ -85,7 +85,16 @@ async function fetchTikTokProfile(username, endpoint, apiKey, host) {
   const configuredHost = host.trim() || defaultRapidApiHost;
   if (configuredEndpoint) {
     try {
-      return await fetchRapidApiProfile(clean, configuredEndpoint, configuredKey, configuredHost);
+      const result = await fetchRapidApiProfile(clean, configuredEndpoint, configuredKey, configuredHost);
+      // tiktok-scraper7 /user/info returns no region field — fetch it from TikWM.
+      if (!result.region) {
+        try {
+          const wm = await fetchJson(`https://www.tikwm.com/api/user/info?unique_id=${encodeURIComponent(clean)}`);
+          result.region = findValue(wm, ['region', 'regionCode', 'countryCode', 'country', 'region_code', 'country_code']);
+          if (result.region) result.source = 'RapidAPI + TikWM (region)';
+        } catch { /* Region stays unknown; the UI handles it gracefully. */ }
+      }
+      return result;
     } catch (err) {
       // RapidAPI failed (bad config, quota, network) — fall back to public sources below.
       console.warn('RapidAPI lookup failed, falling back to public sources:', err.message);
@@ -121,7 +130,7 @@ function profileFrom(data, username, region, source) {
 
 function App() {
   const [username, setUsername] = useState(''); const [profile, setProfile] = useState(null);
-  const [advanced, setAdvanced] = useState(false); const [endpoint, setEndpoint] = useState(defaultRapidApiEndpoint);
+  const [endpoint, setEndpoint] = useState(defaultRapidApiEndpoint);
   const [key, setKey] = useState(defaultRapidApiKey); const [host, setHost] = useState(defaultRapidApiHost);
   const [loading, setLoading] = useState(false); const [error, setError] = useState('');
   async function search(event) {
@@ -133,6 +142,6 @@ function App() {
   return <main dir="rtl"><header><div className="brand"><b>TAD</b></div><div className="status"><i/> {loading ? 'جارٍ الجلب...' : profile ? `بيانات حقيقية · ${profile.source}` : 'جاهز'}</div></header>
     <section className="hero"><p className="eyebrow">لوحة تحكم ذكية للحسابات</p><h1>اعرف تفاصيل حساب<br/><em>TikTok</em> في ثوانٍ.</h1><p className="lead">أدخل اسم المستخدم لاستخراج الدولة/المنطقة الفعلية من بيانات الملف العامة.</p><form onSubmit={search}><span>@</span><input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="أدخل اسم المستخدم..."/><button disabled={loading}>{loading ? 'جارٍ...' : 'عرض المعلومات'}</button></form>{error && <p className="error">{error}</p>}</section>
     {profile && <section className="result"><div className="profile card"><img src={profile.avatar}/><div><h2>{profile.nick} {profile.verified === true && <small>✓ موثّق</small>}</h2><p className="handle">@{profile.name}</p><p>{profile.sig}</p></div><label>بيانات حقيقية</label></div><div className="grid"><article className="card"><h3>معرّفات المستخدم</h3><dl><dt>Unique ID</dt><dd>{profile.id}</dd><dt>secUid</dt><dd className="mono">{profile.sec}</dd><dt>حالة التحقق</dt><dd>{profile.verified === true ? 'حساب موثّق' : 'غير موثّق'}</dd></dl></article><article className="card"><h3>إحصائيات الحساب</h3><div className="stats"><div><strong>{profile.followers}</strong><span>المتابعون</span></div><div><strong>{profile.following}</strong><span>يتابع</span></div><div><strong>{profile.hearts}</strong><span>الإعجابات</span></div><div><strong>{profile.videos}</strong><span>الفيديوهات</span></div></div></article><article className="card"><h3>الدولة والإعدادات</h3><dl><dt>الدولة/المنطقة الفعلية</dt><dd className="country">{profile.reg[2]} {profile.reg[1]} <b>{profile.reg[0]}</b></dd><dt>المصدر</dt><dd>{profile.source}</dd><dt>الخصوصية</dt><dd>{profile.private === true ? '🔒 حساب خاص' : '🌐 حساب عام'}</dd></dl></article></div></section>}
-    <section className="advanced card"><button className="expand" onClick={() => setAdvanced(!advanced)}>⚙ الإعدادات المتقدمة <span>{advanced ? '−' : '+'}</span></button>{advanced && <div className="fields"><label>RapidAPI Endpoint<input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="https://.../user/info"/></label><label>RapidAPI Host<input value={host} onChange={(e) => setHost(e.target.value)} placeholder="اسم المضيف في RapidAPI"/></label><label>RapidAPI Key<input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="أدخل المفتاح اختيارياً"/></label><p>عند ضبط Endpoint يستخدم التطبيق ترويسة X-RapidAPI-Key و X-RapidAPI-Host، ويرسل username و count=1 مع الحفاظ على معاملات endpoint الحالية. اترك Endpoint فارغاً لاستخدام TikTok SSR ثم TikWM تلقائياً.</p></div>}</section><footer>TAD · تُعرض الدولة فقط عندما تعيدها البيانات؛ لا يتم تخمينها أو توليدها محلياً</footer></main>;
+    <footer>TAD · تُعرض الدولة فقط عندما تعيدها البيانات؛ لا يتم تخمينها أو توليدها محلياً</footer></main>;
 }
 createRoot(document.getElementById('root')).render(<App/>);
