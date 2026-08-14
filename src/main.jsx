@@ -17,7 +17,7 @@ const i18n = {
     countryTitle: 'Country & Settings', country: 'Actual Country/Region', privacy: 'Privacy',
     privateAcc: 'Private account', publicAcc: 'Public account',
     errorPrefix: 'Failed to fetch real data:', errorSuffix: 'Check the username or source settings.',
-    langButton: 'عربي',
+    langButton: 'عربي', footer: 'Vibe-coded with 💚 in Riyadh, Saudi Arabia',
   },
   ar: {
     dir: 'rtl', statusReady: 'جاهز', statusLoading: 'جارٍ الجلب…', statusReal: 'بيانات حقيقية',
@@ -28,9 +28,16 @@ const i18n = {
     countryTitle: 'الدولة والإعدادات', country: 'الدولة/المنطقة الفعلية', privacy: 'الخصوصية',
     privateAcc: 'حساب خاص', publicAcc: 'حساب عام',
     errorPrefix: 'تعذر جلب البيانات الحقيقية:', errorSuffix: 'تحقق من اسم المستخدم أو إعدادات المصدر.',
-    langButton: 'English',
+    langButton: 'English', footer: 'صُنع بـ💚 في الرياض، السعودية العظمى',
   },
 };
+
+const GitHubIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.27-.01-1.17-.02-2.12-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.58.23 2.75.11 3.04.73.81 1.18 1.83 1.18 3.09 0 4.42-2.7 5.39-5.26 5.68.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .31.21.67.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
+);
+const EmailIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+);
 
 const env = import.meta.env;
 const envValue = (name) => env[`VITE_${name}`] || env[name] || '';
@@ -207,6 +214,7 @@ function App() {
   return <main dir={t.dir}><header><div className="brand"><b>TAD</b></div><div className="header-actions"><div className="status"><i/> {loading ? t.statusLoading : profile ? t.statusReal : t.statusReady}</div><button className="lang" onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}>{t.langButton}</button></div></header>
     <section className="hero"><h1>{t.heroA} <em>TikTok</em> {t.heroB}</h1><br></br><form onSubmit={search}><span>@</span><input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t.placeholder}/><button disabled={loading}>{loading ? t.loading : t.submit}</button></form>{error && <p className="error">{error}</p>}</section>
     {profile && <section className="result"><div className="profile card"><img src={profile.avatar}/><div><h2>{profile.nick} {profile.verified === true && <small>✓ {t.verified}</small>}</h2><p className="handle">@{profile.name}</p><p>{profile.sig}</p></div><label>{t.realLabel}</label></div><div className="grid"><article className="card"><h3>{t.statsTitle}</h3><div className="stats"><div><strong>{profile.followers}</strong><span>{t.followers}</span></div><div><strong>{profile.following}</strong><span>{t.following}</span></div><div><strong>{profile.hearts}</strong><span>{t.hearts}</span></div><div><strong>{profile.videos}</strong><span>{t.videos}</span></div></div></article><article className="card"><h3>{t.countryTitle}</h3><dl><dt>{t.country}</dt><dd className="country">{profile.reg[2]} {profile.reg[1][lang]} <b>{profile.reg[0]}</b></dd><dt>{t.privacy}</dt><dd>{profile.private === true ? `🔒 ${t.privateAcc}` : `🌐 ${t.publicAcc}`}</dd></dl></article></div></section>}
+    <footer><p>{t.footer}</p><div className="social"><a href="https://github.com/Fahad-BA/TAD" target="_blank" rel="noopener noreferrer" aria-label="GitHub"><GitHubIcon/></a><a href="mailto:TAD@fhidan.com" aria-label="Email"><EmailIcon/></a></div></footer>
   </main>;
 }
 createRoot(document.getElementById('root')).render(<App/>);
