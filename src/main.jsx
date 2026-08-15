@@ -17,7 +17,7 @@ const i18n = {
     countryTitle: 'Country & Settings', country: 'Actual Country/Region', privacy: 'Privacy',
     privateAcc: 'Private account', publicAcc: 'Public account',
     errorPrefix: 'Failed to fetch real data:', errorSuffix: 'Check the username or source settings.',
-    langButton: 'عربي', footer: 'Vibe-coded with 💚 in Riyadh, Saudi Arabia',
+    langButton: 'عربي', footer: 'Built with 💚 in Riyadh, Saudi Arabia',
   },
   ar: {
     dir: 'rtl', statusReady: 'جاهز', statusLoading: 'جارٍ الجلب…', statusReal: 'بيانات حقيقية',
