@@ -206,6 +206,8 @@ function App() {
     localStorage.setItem('tad-lang', lang);
   }, [lang]);
 
+  const cleanUsername = (text) => text.replace(/[^a-zA-Z0-9_.]/g, '');
+
   async function search(event) {
     event.preventDefault(); const name = username.trim().replace(/^@/, '') || 'creator'; setLoading(true); setError('');
     try { const result = await fetchTikTokProfile(name, endpoint, key, host); setProfile(profileFrom(result.data, name, result.region, result.source)); }
@@ -213,7 +215,7 @@ function App() {
     finally { setLoading(false); }
   }
   return <main dir={t.dir}><header><div className="brand"><b>TAD</b></div><div className="header-actions"><div className="status"><i/> {loading ? t.statusLoading : profile ? t.statusReal : t.statusReady}</div><button className="lang" onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}>{t.langButton}</button></div></header>
-    <section className="hero"><h1>{t.heroA} <em>TikTok</em> {t.heroB}</h1><br></br><form onSubmit={search}><span>@</span><input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t.placeholder}/><button disabled={loading}>{loading ? t.loading : t.submit}</button></form>{error && <p className="error">{error}</p>}</section>
+    <section className="hero"><h1>{t.heroA} <em>TikTok</em> {t.heroB}</h1><br /><form onSubmit={search}><span>@</span><input value={username} onChange={(e) => setUsername(cleanUsername(e.target.value))} onPaste={(e) => { const pasted = e.clipboardData.getData('text'); e.preventDefault(); setUsername(cleanUsername(pasted)); }} placeholder={t.placeholder}/><button disabled={loading}>{loading ? t.loading : t.submit}</button></form>{error && <p className="error">{error}</p>}</section>
     {profile && <section className="result"><div className="profile card"><img src={profile.avatar}/><div><h2>{profile.nick} {profile.verified === true && <small>✓ {t.verified}</small>}</h2><p className="handle">@{profile.name}</p><p>{profile.sig}</p></div><label>{t.realLabel}</label></div><div className="grid"><article className="card"><h3>{t.statsTitle}</h3><div className="stats"><div><strong>{profile.followers}</strong><span>{t.followers}</span></div><div><strong>{profile.following}</strong><span>{t.following}</span></div><div><strong>{profile.hearts}</strong><span>{t.hearts}</span></div><div><strong>{profile.videos}</strong><span>{t.videos}</span></div></div></article><article className="card"><h3>{t.countryTitle}</h3><dl><dt>{t.country}</dt><dd className="country">{profile.reg[2]} {profile.reg[1][lang]} <b>{profile.reg[0]}</b></dd><dt>{t.privacy}</dt><dd>{profile.private === true ? `🔒 ${t.privateAcc}` : `🌐 ${t.publicAcc}`}</dd></dl></article></div></section>}
     <footer><p>{t.footer}</p><div className="social"><a href="https://github.com/Fahad-BA/TAD" target="_blank" rel="noopener noreferrer" aria-label="GitHub"><GitHubIcon/></a><a href="mailto:TAD@fhidan.com" aria-label="Email"><EmailIcon/></a></div></footer>
   </main>;
