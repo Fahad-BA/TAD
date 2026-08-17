@@ -205,16 +205,7 @@ function App() {
     document.documentElement.lang = lang;
     localStorage.setItem('tad-lang', lang);
   }, [lang]);
-  // On first open: auto-paste clipboard into the search bar (browser may ask for clipboard permission once)
-  useEffect(() => {
-    (async () => {
-      try {
-        const text = (await navigator.clipboard.readText() || '').trim();
-        if (text) setUsername(text.replace(/^@/, ''));
-      } catch { /* permission denied or unsupported — just focus */ }
-      document.querySelector('.hero input')?.focus();
-    })();
-  }, []);
+
   async function search(event) {
     event.preventDefault(); const name = username.trim().replace(/^@/, '') || 'creator'; setLoading(true); setError('');
     try { const result = await fetchTikTokProfile(name, endpoint, key, host); setProfile(profileFrom(result.data, name, result.region, result.source)); }
